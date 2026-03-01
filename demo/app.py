@@ -468,7 +468,24 @@ def execute_tool(name: str, args: dict, token: str) -> str:
                 headers=headers,
                 timeout=10,
             )
-            return json.dumps(r3.json(), indent=2)
+            data = r3.json()
+            if r3.status_code != 200:
+                # Checkout failed — make it very clear to the LLM
+                return json.dumps({
+                    "error": "CHECKOUT_FAILED",
+                    "message": "The order was NOT placed. Do NOT tell the user an order number.",
+                    "status_code": r3.status_code,
+                    "details": data,
+                }, indent=2)
+            # Verify order was actually created
+            order_info = data.get("order")
+            if not order_info or not order_info.get("id"):
+                return json.dumps({
+                    "error": "NO_ORDER_CREATED",
+                    "message": "Checkout completed but no order ID was returned. Do NOT invent an order number.",
+                    "response": data,
+                }, indent=2)
+            return json.dumps(data, indent=2)
 
         elif name == "get_session":
             r = httpx.get(
