@@ -48,7 +48,6 @@ services:
       - wordpress_data:/var/www/html
       - ./wordpress/uploads:/var/www/html/wp-content/uploads
       - ./wordpress/setup.sh:/setup.sh
-      - ./wordpress/prod.sh:/prod.sh:ro
     environment:
       WORDPRESS_DB_HOST: mysql:3306
       WORDPRESS_DB_USER: wordpress

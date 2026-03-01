@@ -180,19 +180,6 @@ curl http://localhost:8000/.well-known/ucp   # should return UCP manifest JSON
 - **Gemini demo UI**: `http://localhost:7860`
 - **WordPress admin**: `http://localhost:8080/wp-admin` (default: `admin` / `adminpassword`)
 
-**Production — images not loading?** Two steps:
-
-1. Set in `.env`: `WP_SITEURL=http://159.65.188.106:8080` (use your real URL)
-2. Run the fix (from project root on the prod server):
-```bash
-docker compose run --rm wpcli bash /prod.sh
-```
-This runs `wp search-replace` to update all URLs in the DB. If images are still missing (empty uploads), first run:
-```bash
-docker compose up -d --force-recreate wpcli
-```
-Wait ~90s for re-import, then run the fix script above.
-
 ---
 
 ### 90-Second API Quickstart

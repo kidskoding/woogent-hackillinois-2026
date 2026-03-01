@@ -25,4 +25,6 @@ wordpress_data/
 Thumbs.db
 
 api/.private_key.pem
-wordpress/uploads/
+
+# WooCommerce logs (uploads/ is committed for sample product images)
+wordpress/uploads/wc-logs/
