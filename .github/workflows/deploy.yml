@@ -17,7 +17,8 @@ jobs:
           script: |
             set -e
             cd ~/woogent
-            git pull origin master
+            git fetch origin master
+            git reset --hard origin/master
 
             # Rebuild API and demo; force-recreate wordpress to re-bind theme file mounts
             docker compose up -d --build api demo
