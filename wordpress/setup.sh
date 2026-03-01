@@ -40,18 +40,25 @@ wp option update woocommerce_custom_orders_table_enabled yes --allow-root 2>/dev
 # Run WooCommerce installer to create/migrate HPOS tables
 wp eval 'WC_Install::install();' --user=admin --allow-root 2>/dev/null || true
 
-# Import sample products if not already imported
+# Import sample products if not already imported, OR if uploads are empty (prod: uploads/ is gitignored)
 PRODUCT_COUNT=$(wp post list --post_type=product --format=count --allow-root 2>/dev/null || echo "0")
-if [ "$PRODUCT_COUNT" -lt "5" ]; then
-  echo "Importing WooCommerce sample data..."
-  # Download the official WooCommerce sample data
+UPLOADS_OK=0
+[ -d "wp-content/uploads/2019/01" ] && [ -n "$(ls -A wp-content/uploads/2019/01 2>/dev/null)" ] && UPLOADS_OK=1
+
+if [ "$PRODUCT_COUNT" -lt "5" ] || [ "$UPLOADS_OK" = "0" ]; then
+  if [ "$UPLOADS_OK" = "0" ] && [ "$PRODUCT_COUNT" -ge "5" ]; then
+    echo "Uploads empty (prod deploy) — re-importing to download images..."
+    wp post delete $(wp post list --post_type=product --format=ids --allow-root 2>/dev/null) --force --allow-root 2>/dev/null || true
+  elif [ "$PRODUCT_COUNT" -lt "5" ]; then
+    echo "Importing WooCommerce sample data..."
+  fi
   wp plugin install wordpress-importer --activate --allow-root
   curl -sL "https://raw.githubusercontent.com/woocommerce/woocommerce/trunk/plugins/woocommerce/sample-data/sample_products.xml" \
     -o /tmp/woo-sample.xml
   wp import /tmp/woo-sample.xml --authors=create --allow-root
   echo "Sample data imported."
 else
-  echo "Products already exist ($PRODUCT_COUNT found), skipping import."
+  echo "Products exist ($PRODUCT_COUNT), uploads OK, skipping import."
 fi
 
 # Install and configure Stripe payment gateway (check filesystem for fresh deploys)
