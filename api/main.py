@@ -41,6 +41,12 @@ This API implements Google's [Universal Commerce Protocol (UCP)](https://ucp.dev
 on top of WooCommerce, enabling AI agents like Gemini to discover, browse, and
 checkout from a WooCommerce store autonomously.
 
+### First request (quickstart)
+
+1. **No auth needed:** `GET /.well-known/ucp` — returns the capability manifest.
+2. **Browse products:** `GET /ucp/products?q=hoodie&limit=5` — no auth required.
+3. **Checkout (requires token):** Get a token via OAuth (`/oauth2/authorize` → `/oauth2/token`) or, in demo mode, `POST /demo/token` with `client_id` and `client_secret`. Then call `POST /ucp/checkout-sessions` with `Authorization: Bearer <token>` and required headers (see Checkout section).
+
 ### How it works
 
 1. **Discovery**: AI agents start at `/.well-known/ucp` to learn what this service supports.
@@ -50,12 +56,14 @@ checkout from a WooCommerce store autonomously.
 
 ### Authentication
 
-All checkout endpoints require a Bearer token obtained via OAuth 2.0:
+All checkout (and order) endpoints require a Bearer token obtained via OAuth 2.0:
 
 ```
 GET /oauth2/authorize?client_id=...&redirect_uri=...&response_type=code&scope=ucp:scopes:checkout_session&state=...
 POST /oauth2/token  (HTTP Basic + authorization code)
 ```
+
+State-mutating checkout calls also require: **Idempotency-Key** (UUID), **Request-Id**, and **UCP-Agent** headers.
 
 ### Prices
 

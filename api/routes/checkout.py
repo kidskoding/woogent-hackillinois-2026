@@ -66,12 +66,19 @@ def _validate_idempotency_key(
     description=(
         "Initiates a UCP checkout session. Items are validated against live WooCommerce "
         "inventory. Prices are sourced from WooCommerce (client-supplied prices are ignored). "
-        "Returns a session in `incomplete` status."
+        "Returns a session in `incomplete` status. **Required headers:** Idempotency-Key (UUID), Request-Id, UCP-Agent."
     ),
+    responses={
+        400: {"description": "Bad request (e.g. MISSING_IDEMPOTENCY_KEY)", "model": UCPError},
+        401: {"description": "Missing or invalid Bearer token (MISSING_TOKEN, INVALID_TOKEN)", "model": UCPError},
+    },
     dependencies=[Depends(require_auth), Depends(_validate_idempotency_key)],
 )
 async def create_session(
     request: CreateSessionRequest,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key", description="**Required.** UUID; same key returns same result (idempotent)."),
+    request_id: Optional[str] = Header(None, alias="Request-Id", description="Client request ID for tracing."),
+    ucp_agent: Optional[str] = Header(None, alias="UCP-Agent", description="Agent or client profile URL."),
     db: AsyncSession = Depends(get_db),
 ):
     return await create_checkout_session(request, db)
@@ -82,6 +89,10 @@ async def create_session(
     response_model=CheckoutSession,
     summary="Get a checkout session",
     description="Retrieve the current state of a checkout session by its ID.",
+    responses={
+        401: {"description": "Missing or invalid Bearer token", "model": UCPError},
+        404: {"description": "Session not found (SESSION_NOT_FOUND)", "model": UCPError},
+    },
     dependencies=[Depends(require_auth)],
 )
 async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
@@ -110,13 +121,21 @@ async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
     description=(
         "Update the session with a shipping address and/or select a shipping method. "
         "Once an address is provided, available shipping options are returned in the response. "
-        "The buyer can then select an option and call this endpoint again."
+        "The buyer can then select an option and call this endpoint again. **Required headers:** Idempotency-Key, Request-Id, UCP-Agent."
     ),
+    responses={
+        400: {"description": "Bad request (e.g. MISSING_IDEMPOTENCY_KEY)", "model": UCPError},
+        401: {"description": "Missing or invalid Bearer token", "model": UCPError},
+        404: {"description": "Session not found (SESSION_NOT_FOUND)", "model": UCPError},
+    },
     dependencies=[Depends(require_auth), Depends(_validate_idempotency_key)],
 )
 async def update_session(
     session_id: str,
     request: UpdateSessionRequest,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key", description="**Required.** UUID for idempotent requests."),
+    request_id: Optional[str] = Header(None, alias="Request-Id", description="Client request ID for tracing."),
+    ucp_agent: Optional[str] = Header(None, alias="UCP-Agent", description="Agent or client profile URL."),
     db: AsyncSession = Depends(get_db),
 ):
     return await update_checkout_session(session_id, request, db)
@@ -129,13 +148,21 @@ async def update_session(
     description=(
         "Finalizes the checkout: validates stock one final time, creates a WooCommerce order "
         "in the database, and transitions the session to `completed` status. "
-        "Payment token is accepted but not charged in this demo."
+        "Payment token is accepted but not charged in this demo. **Required headers:** Idempotency-Key, Request-Id, UCP-Agent."
     ),
+    responses={
+        400: {"description": "Bad request (e.g. MISSING_IDEMPOTENCY_KEY, out of stock)", "model": UCPError},
+        401: {"description": "Missing or invalid Bearer token", "model": UCPError},
+        404: {"description": "Session not found (SESSION_NOT_FOUND)", "model": UCPError},
+    },
     dependencies=[Depends(require_auth), Depends(_validate_idempotency_key)],
 )
 async def complete_session(
     session_id: str,
     request: CompleteSessionRequest,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key", description="**Required.** UUID for idempotent requests."),
+    request_id: Optional[str] = Header(None, alias="Request-Id", description="Client request ID for tracing."),
+    ucp_agent: Optional[str] = Header(None, alias="UCP-Agent", description="Agent or client profile URL."),
     db: AsyncSession = Depends(get_db),
 ):
     return await complete_checkout_session(session_id, request, db)
@@ -145,8 +172,19 @@ async def complete_session(
     "/{session_id}/cancel",
     response_model=CheckoutSession,
     summary="Cancel a checkout session",
-    description="Cancel an active checkout session. Completed sessions cannot be cancelled.",
+    description="Cancel an active checkout session. Completed sessions cannot be cancelled. **Required headers:** Idempotency-Key, Request-Id, UCP-Agent.",
+    responses={
+        400: {"description": "Bad request (e.g. MISSING_IDEMPOTENCY_KEY)", "model": UCPError},
+        401: {"description": "Missing or invalid Bearer token", "model": UCPError},
+        404: {"description": "Session not found (SESSION_NOT_FOUND)", "model": UCPError},
+    },
     dependencies=[Depends(require_auth), Depends(_validate_idempotency_key)],
 )
-async def cancel_session(session_id: str, db: AsyncSession = Depends(get_db)):
+async def cancel_session(
+    session_id: str,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key", description="**Required.** UUID for idempotent requests."),
+    request_id: Optional[str] = Header(None, alias="Request-Id", description="Client request ID for tracing."),
+    ucp_agent: Optional[str] = Header(None, alias="UCP-Agent", description="Agent or client profile URL."),
+    db: AsyncSession = Depends(get_db),
+):
     return await cancel_checkout_session(session_id, db)

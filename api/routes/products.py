@@ -48,13 +48,14 @@ def _format_product(p: dict) -> dict:
     description=(
         "Returns WooCommerce products matching the given filters. "
         "AI agents use this endpoint to browse the catalog before initiating checkout. "
+        "**Pagination:** Use `limit` and `offset`; when `has_more` is true, request the next page with `offset + limit`."
         "\n\n**Examples:**\n"
         "- `GET /ucp/products?q=hoodie` — search by keyword\n"
         "- `GET /ucp/products?max_price=50` — products under $50\n"
         "- `GET /ucp/products?category=hoodies` — by category slug\n"
         "- `GET /ucp/products?q=blue&max_price=50&limit=5` — combined filters"
     ),
-    response_description="List of matching products in UCP format.",
+    response_description="List of matching products in UCP format (products, count, limit, offset, has_more).",
 )
 async def list_products(
     q: Optional[str] = Query(None, description="Keyword search on product title and description."),
@@ -89,6 +90,9 @@ async def list_products(
     "/products/{product_id}",
     summary="Get a single product",
     description="Retrieve full details for a product by its WooCommerce post ID.",
+    responses={
+        404: {"description": "Product not found (PRODUCT_NOT_FOUND)", "model": UCPError},
+    },
 )
 async def get_product_detail(product_id: str, db: AsyncSession = Depends(get_db)):
     product = await get_product(db, product_id)
