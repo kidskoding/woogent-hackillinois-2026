@@ -66,9 +66,46 @@ def _validate_idempotency_key(
     description=(
         "Initiates a UCP checkout session. Items are validated against live WooCommerce "
         "inventory. Prices are sourced from WooCommerce (client-supplied prices are ignored). "
-        "Returns a session in `incomplete` status. **Required headers:** Idempotency-Key (UUID), Request-Id, UCP-Agent."
+        "Returns a session in `incomplete` status.\n\n"
+        "**Required headers:** `Idempotency-Key` (UUID), `Request-Id`, `UCP-Agent`\n\n"
+        "**Example (curl):**\n"
+        "```bash\n"
+        'curl -X POST http://localhost:8000/ucp/checkout-sessions \\\n'
+        '  -H "Authorization: Bearer $TOKEN" \\\n'
+        '  -H "Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000" \\\n'
+        '  -H "Request-Id: req-001" \\\n'
+        '  -H "Content-Type: application/json" \\\n'
+        "  -d '{\"line_items\":[{\"item\":{\"id\":\"19\",\"title\":\"Hoodie\"},\"quantity\":1,\"price_per_item\":{\"amount_micros\":45000000}}]}'\n"
+        "```"
     ),
     responses={
+        201: {
+            "description": "Session created successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "sess_abc123",
+                        "status": "incomplete",
+                        "line_items": [
+                            {
+                                "item": {"id": "19", "title": "Hoodie with Logo"},
+                                "quantity": 1,
+                                "price_per_item": {"amount_micros": 45000000, "currency_code": "USD"},
+                                "total_price": {"amount_micros": 45000000, "currency_code": "USD"},
+                            }
+                        ],
+                        "totals": {
+                            "subtotal": {"amount_micros": 45000000, "currency_code": "USD"},
+                            "tax": {"amount_micros": 0, "currency_code": "USD"},
+                            "shipping": {"amount_micros": 0, "currency_code": "USD"},
+                            "total": {"amount_micros": 45000000, "currency_code": "USD"},
+                        },
+                        "fulfillment": None,
+                        "created_at": "2026-03-01T12:00:00Z",
+                    }
+                }
+            },
+        },
         400: {"description": "Bad request (e.g. MISSING_IDEMPOTENCY_KEY)", "model": UCPError},
         401: {"description": "Missing or invalid Bearer token (MISSING_TOKEN, INVALID_TOKEN)", "model": UCPError},
     },
@@ -121,9 +158,50 @@ async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
     description=(
         "Update the session with a shipping address and/or select a shipping method. "
         "Once an address is provided, available shipping options are returned in the response. "
-        "The buyer can then select an option and call this endpoint again. **Required headers:** Idempotency-Key, Request-Id, UCP-Agent."
+        "The buyer can then select an option and call this endpoint again.\n\n"
+        "**Required headers:** `Idempotency-Key`, `Request-Id`, `UCP-Agent`\n\n"
+        "**Example — Set shipping address (curl):**\n"
+        "```bash\n"
+        'curl -X PUT http://localhost:8000/ucp/checkout-sessions/{session_id} \\\n'
+        '  -H "Authorization: Bearer $TOKEN" \\\n'
+        '  -H "Idempotency-Key: $(uuidgen)" \\\n'
+        '  -H "Request-Id: req-update-001" \\\n'
+        '  -H "Content-Type: application/json" \\\n'
+        '  -d \'{"fulfillment":{"address":{"street_address":"123 Main St","locality":"Champaign","administrative_area":"IL","postal_code":"61820","country_code":"US"}}}\'\n'
+        "```"
     ),
     responses={
+        200: {
+            "description": "Session updated — shipping options returned",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "sess_abc123",
+                        "status": "incomplete",
+                        "fulfillment": {
+                            "address": {
+                                "street_address": "123 Main St",
+                                "locality": "Champaign",
+                                "administrative_area": "IL",
+                                "postal_code": "61820",
+                                "country_code": "US",
+                            },
+                            "selected_option_id": None,
+                            "options": [
+                                {"id": "flat_rate:1", "label": "Flat Rate", "price": {"amount_micros": 5000000, "currency_code": "USD"}},
+                                {"id": "free_shipping:2", "label": "Free Shipping", "price": {"amount_micros": 0, "currency_code": "USD"}},
+                            ],
+                        },
+                        "totals": {
+                            "subtotal": {"amount_micros": 45000000, "currency_code": "USD"},
+                            "tax": {"amount_micros": 3600000, "currency_code": "USD"},
+                            "shipping": {"amount_micros": 0, "currency_code": "USD"},
+                            "total": {"amount_micros": 48600000, "currency_code": "USD"},
+                        },
+                    }
+                }
+            },
+        },
         400: {"description": "Bad request (e.g. MISSING_IDEMPOTENCY_KEY)", "model": UCPError},
         401: {"description": "Missing or invalid Bearer token", "model": UCPError},
         404: {"description": "Session not found (SESSION_NOT_FOUND)", "model": UCPError},
@@ -146,11 +224,51 @@ async def update_session(
     response_model=CheckoutSession,
     summary="Complete a checkout session",
     description=(
-        "Finalizes the checkout: validates stock one final time, creates a WooCommerce order "
-        "in the database, and transitions the session to `completed` status. "
-        "Payment token is accepted but not charged in this demo. **Required headers:** Idempotency-Key, Request-Id, UCP-Agent."
+        "Finalizes the checkout: validates stock one final time, processes payment via Stripe "
+        "(if configured), creates a WooCommerce order, and transitions the session to `completed` status.\n\n"
+        "**Required headers:** `Idempotency-Key`, `Request-Id`, `UCP-Agent`\n\n"
+        "**Example (curl):**\n"
+        "```bash\n"
+        'curl -X POST http://localhost:8000/ucp/checkout-sessions/{session_id}/complete \\\n'
+        '  -H "Authorization: Bearer $TOKEN" \\\n'
+        '  -H "Idempotency-Key: $(uuidgen)" \\\n'
+        '  -H "Request-Id: req-complete-001" \\\n'
+        '  -H "Content-Type: application/json" \\\n'
+        '  -d \'{"payment_data":{"instrument":{"type":"PAYMENT_TOKEN","token":"tok_visa"}}}\'\n'
+        "```"
     ),
     responses={
+        200: {
+            "description": "Checkout completed — order created",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "sess_abc123",
+                        "status": "completed",
+                        "line_items": [
+                            {
+                                "item": {"id": "19", "title": "Hoodie with Logo"},
+                                "quantity": 1,
+                                "price_per_item": {"amount_micros": 45000000, "currency_code": "USD"},
+                                "total_price": {"amount_micros": 45000000, "currency_code": "USD"},
+                            }
+                        ],
+                        "totals": {
+                            "subtotal": {"amount_micros": 45000000, "currency_code": "USD"},
+                            "tax": {"amount_micros": 3600000, "currency_code": "USD"},
+                            "shipping": {"amount_micros": 5000000, "currency_code": "USD"},
+                            "total": {"amount_micros": 53600000, "currency_code": "USD"},
+                        },
+                        "order": {
+                            "id": "127",
+                            "status": "wc-processing",
+                            "view_url": "http://localhost:8080/checkout/order-received/127/",
+                        },
+                        "updated_at": "2026-03-01T12:05:00Z",
+                    }
+                }
+            },
+        },
         400: {"description": "Bad request (e.g. MISSING_IDEMPOTENCY_KEY, out of stock)", "model": UCPError},
         401: {"description": "Missing or invalid Bearer token", "model": UCPError},
         404: {"description": "Session not found (SESSION_NOT_FOUND)", "model": UCPError},
@@ -172,8 +290,33 @@ async def complete_session(
     "/{session_id}/cancel",
     response_model=CheckoutSession,
     summary="Cancel a checkout session",
-    description="Cancel an active checkout session. Completed sessions cannot be cancelled. **Required headers:** Idempotency-Key, Request-Id, UCP-Agent.",
+    description=(
+        "Cancel an active checkout session. Completed sessions cannot be cancelled. "
+        "**Required headers:** Idempotency-Key, Request-Id, UCP-Agent.\n\n"
+        "**Example (curl):**\n"
+        "```bash\n"
+        'curl -X POST http://localhost:8000/ucp/checkout-sessions/{session_id}/cancel \\\n'
+        '  -H "Authorization: Bearer $TOKEN" \\\n'
+        '  -H "Idempotency-Key: $(uuidgen)" \\\n'
+        '  -H "Request-Id: req-cancel-001"\n'
+        "```"
+    ),
     responses={
+        200: {
+            "description": "Session cancelled",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "sess_abc123",
+                        "status": "cancelled",
+                        "line_items": [],
+                        "totals": None,
+                        "fulfillment": None,
+                        "updated_at": "2026-03-01T12:10:00Z",
+                    }
+                }
+            },
+        },
         400: {"description": "Bad request (e.g. MISSING_IDEMPOTENCY_KEY)", "model": UCPError},
         401: {"description": "Missing or invalid Bearer token", "model": UCPError},
         404: {"description": "Session not found (SESSION_NOT_FOUND)", "model": UCPError},

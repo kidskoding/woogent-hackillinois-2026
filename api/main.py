@@ -41,47 +41,134 @@ This API implements Google's [Universal Commerce Protocol (UCP)](https://ucp.dev
 on top of WooCommerce, enabling AI agents like Gemini to discover, browse, and
 checkout from a WooCommerce store autonomously.
 
-### First request (quickstart)
+---
 
-1. **No auth needed:** `GET /.well-known/ucp` — returns the capability manifest.
-2. **Browse products:** `GET /ucp/products?q=hoodie&limit=5` — no auth required.
-3. **Checkout (requires token):** Get a token via OAuth (`/oauth2/authorize` → `/oauth2/token`) or, in demo mode, `POST /demo/token` with `client_id` and `client_secret`. Then call `POST /ucp/checkout-sessions` with `Authorization: Bearer <token>` and required headers (see Checkout section).
+## Quick Start — Try These Now
 
-### How it works
+```bash
+# 1. Discover the store (no auth)
+curl http://localhost:8000/.well-known/ucp
 
-1. **Discovery**: AI agents start at `/.well-known/ucp` to learn what this service supports.
-2. **Browse**: Use `GET /ucp/products` to search the product catalog.
-3. **Checkout**: Create a session → add address → select shipping → complete.
-4. **Identity**: OAuth 2.0 (Authorization Code grant) for secure account linking.
+# 2. Search products (no auth)
+curl "http://localhost:8000/ucp/products?q=hoodie&limit=3"
 
-### Authentication
+# 3. Get a token (demo mode)
+TOKEN=$(curl -s -X POST http://localhost:8000/demo/token \
+  -u "gemini-demo-client:gemini-demo-secret" | jq -r .access_token)
 
-All checkout (and order) endpoints require a Bearer token obtained via OAuth 2.0:
-
+# 4. Create a checkout session
+curl -X POST http://localhost:8000/ucp/checkout-sessions \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -H "Idempotency-Key: $(uuidgen)" \\
+  -H "Request-Id: req-001" \\
+  -H "Content-Type: application/json" \\
+  -d '{"line_items":[{"item":{"id":"19","title":"Hoodie"},"quantity":1,"price_per_item":{"amount_micros":45000000}}]}'
 ```
+
+---
+
+## How It Works
+
+| Step | Endpoint | What happens |
+|------|----------|--------------|
+| 1. **Discover** | `GET /.well-known/ucp` | AI learns capabilities, payment handlers, signing keys |
+| 2. **Browse** | `GET /ucp/products` | Search catalog by keyword, price, category |
+| 3. **Checkout** | `POST /ucp/checkout-sessions` | Create session → set address → select shipping → complete |
+| 4. **Track** | `GET /ucp/orders/{id}` | Check order status, line items, fulfillment |
+
+---
+
+## Authentication
+
+**Public endpoints** (no token): Discovery (`/.well-known/*`), Products (`/ucp/products`)
+
+**Protected endpoints** (Bearer token required): Checkout sessions, Orders
+
+```bash
+# OAuth 2.0 flow (production)
 GET /oauth2/authorize?client_id=...&redirect_uri=...&response_type=code&scope=ucp:scopes:checkout_session&state=...
-POST /oauth2/token  (HTTP Basic + authorization code)
+POST /oauth2/token  # HTTP Basic auth + authorization_code
+
+# Demo shortcut (local dev / hackathon demo)
+curl -X POST http://localhost:8000/demo/token -u "gemini-demo-client:gemini-demo-secret"
 ```
 
-State-mutating checkout calls also require: **Idempotency-Key** (UUID), **Request-Id**, and **UCP-Agent** headers.
+**Required headers on state-mutating calls:**
+- `Authorization: Bearer <token>`
+- `Idempotency-Key: <uuid>` — ensures at-most-once semantics
+- `Request-Id: <client-trace-id>`
 
-### Prices
+---
 
-All monetary values use `amount_micros` (integer, currency × 1,000,000):
-- `$19.99` → `amount_micros: 19990000`
+## Money Format
 
-### Error codes (UCP format)
+All prices use **`amount_micros`** (integer = currency × 1,000,000) to avoid floating-point errors:
 
-Errors return `{"status": "...", "messages": [{"type": "error", "code": "...", "content": "...", "severity": "fatal"|"recoverable"}]}`.
+| Display | amount_micros | currency_code |
+|---------|---------------|---------------|
+| $19.99 | `19990000` | `USD` |
+| $45.00 | `45000000` | `USD` |
+| $0.01 | `10000` | `USD` |
 
-| Code | HTTP | Meaning |
-|------|------|---------|
-| `MISSING_IDEMPOTENCY_KEY` | 400 | Idempotency-Key header required on state-mutating checkout/order calls. |
-| `MISSING_TOKEN` | 401 | Authorization: Bearer header required. |
-| `INVALID_TOKEN` | 401 | Token invalid, expired, or revoked. |
-| `SESSION_NOT_FOUND` | 404 | Checkout session ID unknown or expired. |
-| `PRODUCT_NOT_FOUND` | 404 | Product ID not found. |
-| `ORDER_NOT_FOUND` | 404 | Order ID not found. |
+---
+
+## Error Codes
+
+All errors return UCP-format JSON:
+```json
+{"status": "...", "messages": [{"type": "error", "code": "...", "content": "...", "severity": "fatal|recoverable"}]}
+```
+
+| Code | HTTP | When |
+|------|------|------|
+| `MISSING_IDEMPOTENCY_KEY` | 400 | State-mutating call missing `Idempotency-Key` header |
+| `MISSING_TOKEN` | 401 | No `Authorization: Bearer` header |
+| `INVALID_TOKEN` | 401 | Token expired, revoked, or malformed |
+| `SESSION_NOT_FOUND` | 404 | Checkout session ID unknown or expired |
+| `PRODUCT_NOT_FOUND` | 404 | Product ID does not exist |
+| `ORDER_NOT_FOUND` | 404 | Order ID does not exist |
+| `CANNOT_CANCEL_ORDER` | 409 | Order already paid/shipped — cannot cancel |
+
+---
+
+## End-to-End Checkout Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ 1. DISCOVER                                                         │
+│    GET /.well-known/ucp → learn capabilities, payment handlers      │
+├─────────────────────────────────────────────────────────────────────┤
+│ 2. BROWSE                                                           │
+│    GET /ucp/products?q=hoodie → find product IDs and prices         │
+├─────────────────────────────────────────────────────────────────────┤
+│ 3. AUTHENTICATE                                                     │
+│    POST /demo/token (or full OAuth flow) → get Bearer token         │
+├─────────────────────────────────────────────────────────────────────┤
+│ 4. CREATE SESSION                                                   │
+│    POST /ucp/checkout-sessions → status: "incomplete"               │
+├─────────────────────────────────────────────────────────────────────┤
+│ 5. SET ADDRESS                                                      │
+│    PUT /ucp/checkout-sessions/{id} → returns shipping options       │
+├─────────────────────────────────────────────────────────────────────┤
+│ 6. SELECT SHIPPING                                                  │
+│    PUT /ucp/checkout-sessions/{id} → selected_option_id             │
+├─────────────────────────────────────────────────────────────────────┤
+│ 7. COMPLETE CHECKOUT                                                │
+│    POST /ucp/checkout-sessions/{id}/complete → status: "completed"  │
+│    WooCommerce order created! 🎉                                    │
+├─────────────────────────────────────────────────────────────────────┤
+│ 8. TRACK ORDER                                                      │
+│    GET /ucp/orders/{order_id} → status, tracking, line items        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Links
+
+- **UCP Spec**: [ucp.dev](https://ucp.dev)
+- **Checkout Guide**: [Google UCP Checkout](https://developers.google.com/merchant/ucp/guides/checkout/native)
+- **Source**: [GitHub](https://github.com/kidskoding/woogent-hackillinois-2026)
 """,
     version="1.0.0",
     contact={
@@ -92,13 +179,41 @@ Errors return `{"status": "...", "messages": [{"type": "error", "code": "...", "
         "name": "MIT",
     },
     openapi_tags=[
-        {"name": "Discovery", "description": "UCP manifest and OAuth server metadata."},
-        {"name": "Products", "description": "Search and retrieve product catalog."},
-        {"name": "OAuth 2.0", "description": "Authorization and token endpoints."},
-        {"name": "Checkout", "description": "Create and manage checkout sessions."},
-        {"name": "Orders", "description": "List, get, and cancel orders."},
-        {"name": "Demo", "description": "Demo token shortcut (DEMO_MODE only)."},
-        {"name": "System", "description": "Health and utility."},
+        {
+            "name": "Discovery",
+            "description": "Entry points for AI agents. Start here to learn what the store supports.",
+            "externalDocs": {"description": "UCP Discovery Spec", "url": "https://ucp.dev"},
+        },
+        {
+            "name": "Products",
+            "description": "Browse the product catalog. **No auth required.** Filter by keyword, price, category.",
+        },
+        {
+            "name": "Checkout",
+            "description": (
+                "Create and manage checkout sessions. "
+                "**State machine:** `incomplete` → `pending_payment` → `completed` (or `cancelled`). "
+                "Sessions expire after 24 hours if not completed."
+            ),
+            "externalDocs": {"description": "UCP Checkout Guide", "url": "https://developers.google.com/merchant/ucp/guides/checkout/native"},
+        },
+        {
+            "name": "Orders",
+            "description": "Retrieve order status and details. Cancel unpaid orders.",
+        },
+        {
+            "name": "OAuth 2.0",
+            "description": "Authorization Code grant (RFC 6749). RS256-signed JWTs.",
+            "externalDocs": {"description": "RFC 6749", "url": "https://datatracker.ietf.org/doc/html/rfc6749"},
+        },
+        {
+            "name": "Demo",
+            "description": "Shortcut token endpoint for hackathon demos. Only active when `DEMO_MODE=true`.",
+        },
+        {
+            "name": "System",
+            "description": "Health checks and service metadata.",
+        },
     ],
     lifespan=lifespan,
     docs_url="/docs",

@@ -148,8 +148,33 @@ async def authorize_post(
     description=(
         "Exchange an authorization code for a Bearer access token. "
         "Authenticate with HTTP Basic (client_id:client_secret). "
-        "Returns a signed RS256 JWT valid for 3600 seconds."
+        "Returns a signed RS256 JWT valid for 3600 seconds.\n\n"
+        "**Example (curl):**\n"
+        "```bash\n"
+        'curl -X POST http://localhost:8000/oauth2/token \\\n'
+        '  -u "gemini-demo-client:gemini-demo-secret" \\\n'
+        '  -d "grant_type=authorization_code" \\\n'
+        '  -d "code=AUTH_CODE_FROM_REDIRECT" \\\n'
+        '  -d "redirect_uri=http://localhost:7860/callback"\n'
+        "```"
     ),
+    responses={
+        200: {
+            "description": "Access token issued",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+                        "token_type": "Bearer",
+                        "expires_in": 3600,
+                        "scope": "ucp:scopes:checkout_session",
+                    }
+                }
+            },
+        },
+        400: {"description": "Invalid request (unsupported_grant_type, missing code/redirect_uri)"},
+        401: {"description": "Invalid client credentials or expired/invalid authorization code"},
+    },
 )
 async def token(
     request: Request,

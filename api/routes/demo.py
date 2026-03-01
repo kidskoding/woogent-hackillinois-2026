@@ -26,8 +26,34 @@ DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
     description=(
         "Issues a Bearer token directly using HTTP Basic client credentials. "
         "**Only available when DEMO_MODE=true.** "
-        "Use this to skip the browser-redirect OAuth flow during live demos."
+        "Use this to skip the browser-redirect OAuth flow during live demos.\n\n"
+        "**Example (curl):**\n"
+        "```bash\n"
+        "# Using default demo credentials\n"
+        'curl -X POST http://localhost:8000/demo/token \\\n'
+        '  -u "gemini-demo-client:gemini-demo-secret"\n\n'
+        "# Or with explicit Authorization header\n"
+        'curl -X POST http://localhost:8000/demo/token \\\n'
+        '  -H "Authorization: Basic Z2VtaW5pLWRlbW8tY2xpZW50OmdlbWluaS1kZW1vLXNlY3JldA=="\n'
+        "```"
     ),
+    responses={
+        200: {
+            "description": "Token issued successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+                        "token_type": "Bearer",
+                        "expires_in": 3600,
+                        "scope": "ucp:scopes:checkout_session",
+                    }
+                }
+            },
+        },
+        401: {"description": "Invalid or missing client credentials"},
+        404: {"description": "DEMO_MODE is not enabled"},
+    },
 )
 async def demo_token(request: Request):
     if not DEMO_MODE:

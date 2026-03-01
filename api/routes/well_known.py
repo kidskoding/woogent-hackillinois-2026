@@ -23,9 +23,49 @@ settings = get_settings()
     description=(
         "Returns the Universal Commerce Protocol capability manifest. "
         "AI agents fetch this endpoint first to discover supported services, "
-        "capabilities, payment handlers, and signing keys."
+        "capabilities, payment handlers, and signing keys.\n\n"
+        "**Example (curl):**\n"
+        "```bash\n"
+        "curl http://localhost:8000/.well-known/ucp | jq\n"
+        "```"
     ),
     response_description="UCP manifest JSON",
+    responses={
+        200: {
+            "description": "UCP manifest",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "ucp": {
+                            "version": "2026-01-11",
+                            "services": {
+                                "dev.ucp.shopping": {
+                                    "version": "2026-01-11",
+                                    "spec": "https://ucp.dev/specs/shopping",
+                                    "rest": {
+                                        "schema": "https://ucp.dev/services/shopping/openapi.json",
+                                        "endpoint": "http://localhost:8000/ucp/",
+                                    },
+                                }
+                            },
+                            "capabilities": [
+                                {
+                                    "name": "dev.ucp.shopping.checkout",
+                                    "version": "2026-01-11",
+                                    "spec": "https://ucp.dev/specs/shopping/checkout",
+                                    "schema": "https://ucp.dev/schemas/shopping/checkout.json",
+                                },
+                            ],
+                            "payment_handlers": [
+                                {"name": "google_pay", "supported_instruments": ["CARD", "WALLET"]}
+                            ],
+                            "keys": {"signing_keys": [{"kty": "RSA", "kid": "...", "n": "...", "e": "AQAB"}]},
+                        }
+                    }
+                }
+            },
+        }
+    },
 )
 async def ucp_manifest():
     domain = settings.wc_domain
@@ -84,6 +124,27 @@ async def ucp_manifest():
         "Clients use this to discover token and authorization endpoints "
         "before initiating the identity linking flow."
     ),
+    responses={
+        200: {
+            "description": "OAuth 2.0 server metadata",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "issuer": "http://localhost:8000",
+                        "authorization_endpoint": "http://localhost:8000/oauth2/authorize",
+                        "token_endpoint": "http://localhost:8000/oauth2/token",
+                        "revocation_endpoint": "http://localhost:8000/oauth2/revoke",
+                        "jwks_uri": "http://localhost:8000/.well-known/jwks.json",
+                        "scopes_supported": ["ucp:scopes:checkout_session"],
+                        "response_types_supported": ["code"],
+                        "grant_types_supported": ["authorization_code", "refresh_token"],
+                        "token_endpoint_auth_methods_supported": ["client_secret_basic"],
+                        "code_challenge_methods_supported": ["S256"],
+                    }
+                }
+            },
+        }
+    },
 )
 async def oauth_server_metadata():
     domain = settings.wc_domain

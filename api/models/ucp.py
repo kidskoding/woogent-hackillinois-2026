@@ -202,6 +202,33 @@ class CreateSessionRequest(BaseModel):
 class UpdateSessionRequest(BaseModel):
     """PUT /ucp/checkout-sessions/{id}"""
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "title": "Set shipping address",
+                    "value": {
+                        "fulfillment": {
+                            "address": {
+                                "street_address": "123 Main St",
+                                "locality": "Champaign",
+                                "administrative_area": "IL",
+                                "postal_code": "61820",
+                                "country_code": "US",
+                            }
+                        }
+                    },
+                },
+                {
+                    "title": "Select shipping option",
+                    "value": {
+                        "fulfillment": {"selected_option_id": "flat_rate:1"}
+                    },
+                },
+            ]
+        }
+    )
+
     line_items: Optional[list[LineItem]] = None
     fulfillment: Optional[Fulfillment] = None
     buyer: Optional[BuyerInfo] = None
@@ -209,6 +236,23 @@ class UpdateSessionRequest(BaseModel):
 
 class CompleteSessionRequest(BaseModel):
     """POST /ucp/checkout-sessions/{id}/complete"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "payment_data": {
+                    "instrument": {"type": "PAYMENT_TOKEN", "token": "tok_visa"},
+                    "billing_address": {
+                        "street_address": "123 Main St",
+                        "locality": "Champaign",
+                        "administrative_area": "IL",
+                        "postal_code": "61820",
+                        "country_code": "US",
+                    },
+                }
+            }
+        }
+    )
 
     payment_data: PaymentData
     fulfillment: Optional[Fulfillment] = None

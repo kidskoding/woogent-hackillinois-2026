@@ -118,12 +118,47 @@ class WebhookEvent(BaseModel):
     description=(
         "List WooCommerce orders. Optionally filter by buyer email or status. "
         "Results are ordered newest-first.\n\n"
-        "**Examples:**\n"
-        "- `GET /ucp/orders` — all orders\n"
-        "- `GET /ucp/orders?email=buyer@example.com` — orders for a specific buyer\n"
-        "- `GET /ucp/orders?status=wc-processing` — orders by status\n"
-        "- `GET /ucp/orders?limit=5&offset=10` — paginated"
+        "**Examples (curl):**\n"
+        "```bash\n"
+        "# All orders\n"
+        'curl http://localhost:8000/ucp/orders -H "Authorization: Bearer $TOKEN"\n\n'
+        "# Filter by buyer email\n"
+        'curl "http://localhost:8000/ucp/orders?email=buyer@example.com" \\\n'
+        '  -H "Authorization: Bearer $TOKEN"\n\n'
+        "# Filter by status + pagination\n"
+        'curl "http://localhost:8000/ucp/orders?status=wc-processing&limit=5" \\\n'
+        '  -H "Authorization: Bearer $TOKEN"\n'
+        "```"
     ),
+    responses={
+        200: {
+            "description": "Paginated list of orders",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "orders": [
+                            {
+                                "id": "127",
+                                "status": "wc-processing",
+                                "currency": "USD",
+                                "subtotal_micros": 45000000,
+                                "tax_micros": 3600000,
+                                "total_micros": 53600000,
+                                "billing_email": "buyer@example.com",
+                                "payment_method": "stripe",
+                                "created_at": "2026-03-01 12:05:00",
+                            }
+                        ],
+                        "count": 1,
+                        "limit": 20,
+                        "offset": 0,
+                        "has_more": False,
+                    }
+                }
+            },
+        },
+        401: {"description": "Missing or invalid Bearer token", "model": UCPError},
+    },
     dependencies=[Depends(require_auth)],
 )
 async def list_orders(
@@ -184,8 +219,61 @@ async def list_orders(
     summary="Get order details",
     description=(
         "Retrieve the current status and details of a WooCommerce order "
-        "placed via UCP checkout. Use this to check fulfillment status after purchase."
+        "placed via UCP checkout. Use this to check fulfillment status after purchase.\n\n"
+        "**Example (curl):**\n"
+        "```bash\n"
+        'curl http://localhost:8000/ucp/orders/127 \\\n'
+        '  -H "Authorization: Bearer $TOKEN"\n'
+        "```"
     ),
+    responses={
+        200: {
+            "description": "Order details",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "127",
+                        "status": "wc-processing",
+                        "currency": "USD",
+                        "subtotal_micros": 45000000,
+                        "tax_micros": 3600000,
+                        "total_micros": 53600000,
+                        "billing_address": {
+                            "first_name": "John",
+                            "last_name": "Doe",
+                            "street_address": "123 Main St",
+                            "locality": "Champaign",
+                            "administrative_area": "IL",
+                            "postal_code": "61820",
+                            "country_code": "US",
+                        },
+                        "shipping_address": {
+                            "first_name": "John",
+                            "last_name": "Doe",
+                            "street_address": "123 Main St",
+                            "locality": "Champaign",
+                            "administrative_area": "IL",
+                            "postal_code": "61820",
+                            "country_code": "US",
+                        },
+                        "line_items": [
+                            {
+                                "product_id": "19",
+                                "title": "Hoodie with Logo",
+                                "quantity": 1,
+                                "unit_price_micros": 45000000,
+                                "total_micros": 45000000,
+                            }
+                        ],
+                        "payment_method": "stripe",
+                        "created_at": "2026-03-01 12:05:00",
+                    }
+                }
+            },
+        },
+        401: {"description": "Missing or invalid Bearer token", "model": UCPError},
+        404: {"description": "Order not found (ORDER_NOT_FOUND)", "model": UCPError},
+    },
     dependencies=[Depends(require_auth)],
 )
 async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
@@ -300,8 +388,39 @@ async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
     description=(
         "Cancel an order when it is still in an unpaid/draft state "
         "(e.g. `wc-checkout-draft`, `wc-pending`). "
-        "Paid or finalized orders cannot be cancelled through this endpoint."
+        "Paid or finalized orders cannot be cancelled through this endpoint.\n\n"
+        "**Cancellable statuses:** `wc-checkout-draft`, `wc-pending`, `wc-failed`\n\n"
+        "**Example (curl):**\n"
+        "```bash\n"
+        'curl -X POST http://localhost:8000/ucp/orders/127/cancel \\\n'
+        '  -H "Authorization: Bearer $TOKEN" \\\n'
+        '  -H "Idempotency-Key: $(uuidgen)" \\\n'
+        '  -H "Request-Id: req-cancel-001"\n'
+        "```"
     ),
+    responses={
+        200: {
+            "description": "Order cancelled",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "127",
+                        "status": "wc-cancelled",
+                        "currency": "USD",
+                        "subtotal_micros": 45000000,
+                        "tax_micros": 0,
+                        "total_micros": 45000000,
+                        "line_items": [],
+                        "payment_method": None,
+                        "created_at": "2026-03-01 12:00:00",
+                    }
+                }
+            },
+        },
+        401: {"description": "Missing or invalid Bearer token", "model": UCPError},
+        404: {"description": "Order not found (ORDER_NOT_FOUND)", "model": UCPError},
+        409: {"description": "Order already paid/shipped (CANNOT_CANCEL_ORDER)", "model": UCPError},
+    },
     dependencies=[Depends(require_auth), Depends(_validate_idempotency_key)],
 )
 async def cancel_order(order_id: str, db: AsyncSession = Depends(get_db)):
@@ -398,8 +517,24 @@ async def cancel_order(order_id: str, db: AsyncSession = Depends(get_db)):
         "Requests are verified using HMAC-SHA256 signature in the `X-UCP-Signature` header.\n\n"
         "**Supported events:** `order.created`, `order.updated`, `order.completed`, "
         "`order.cancelled`, `order.refunded`\n\n"
-        "**Signature verification:** `X-UCP-Signature: sha256=<hmac-sha256-hex>`"
+        "**Signature verification:** `X-UCP-Signature: sha256=<hmac-sha256-hex>`\n\n"
+        "**Example payload:**\n"
+        "```json\n"
+        '{"event_type": "order.completed", "order_id": "127", "timestamp": "2026-03-01T12:10:00Z", "data": {}}\n'
+        "```"
     ),
+    responses={
+        200: {
+            "description": "Webhook acknowledged",
+            "content": {
+                "application/json": {
+                    "example": {"received": True, "event_type": "order.completed", "order_id": "127"}
+                }
+            },
+        },
+        400: {"description": "Invalid payload (INVALID_WEBHOOK_PAYLOAD)", "model": UCPError},
+        401: {"description": "Invalid signature (INVALID_WEBHOOK_SIGNATURE)", "model": UCPError},
+    },
     status_code=status.HTTP_200_OK,
 )
 async def order_webhook(

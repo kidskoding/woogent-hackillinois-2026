@@ -49,13 +49,50 @@ def _format_product(p: dict) -> dict:
         "Returns WooCommerce products matching the given filters. "
         "AI agents use this endpoint to browse the catalog before initiating checkout. "
         "**Pagination:** Use `limit` and `offset`; when `has_more` is true, request the next page with `offset + limit`."
-        "\n\n**Examples:**\n"
-        "- `GET /ucp/products?q=hoodie` — search by keyword\n"
-        "- `GET /ucp/products?max_price=50` — products under $50\n"
-        "- `GET /ucp/products?category=hoodies` — by category slug\n"
-        "- `GET /ucp/products?q=blue&max_price=50&limit=5` — combined filters"
+        "\n\n**Examples (curl):**\n"
+        "```bash\n"
+        "# Search by keyword\n"
+        'curl "http://localhost:8000/ucp/products?q=hoodie&limit=3"\n\n'
+        "# Filter by price and stock\n"
+        'curl "http://localhost:8000/ucp/products?max_price=50&in_stock=true"\n'
+        "```"
     ),
     response_description="List of matching products in UCP format (products, count, limit, offset, has_more).",
+    responses={
+        200: {
+            "description": "Products matching the query",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "products": [
+                            {
+                                "id": "19",
+                                "title": "Hoodie with Logo",
+                                "short_description": "Soft cotton hoodie with embroidered logo.",
+                                "sku": "woo-hoodie-logo",
+                                "price": {"amount_micros": 45000000, "currency_code": "USD"},
+                                "in_stock": True,
+                                "url": "http://localhost:8080/?p=19",
+                            },
+                            {
+                                "id": "23",
+                                "title": "Hoodie with Zipper",
+                                "short_description": "Zip-up hoodie in multiple colors.",
+                                "sku": "woo-hoodie-zip",
+                                "price": {"amount_micros": 55000000, "currency_code": "USD"},
+                                "in_stock": True,
+                                "url": "http://localhost:8080/?p=23",
+                            },
+                        ],
+                        "count": 2,
+                        "limit": 20,
+                        "offset": 0,
+                        "has_more": False,
+                    }
+                }
+            },
+        }
+    },
 )
 async def list_products(
     q: Optional[str] = Query(None, description="Keyword search on product title and description."),
