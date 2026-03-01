@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:developer.woocommerce.com)",
+      "WebFetch(domain:ucp.dev)",
+      "WebFetch(domain:medium.com)"
+    ]
+  }
+}

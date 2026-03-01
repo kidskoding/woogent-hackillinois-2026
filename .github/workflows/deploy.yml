@@ -1,0 +1,27 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to DigitalOcean
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/woogent
+            git pull origin master
+
+            # Rebuild API and demo; force-recreate wordpress to re-bind theme file mounts
+            docker compose up -d --build api demo
+            docker compose up -d --force-recreate wordpress
+
+            # Re-run WordPress setup for any migrations (idempotent)
+            docker compose run --rm wpcli

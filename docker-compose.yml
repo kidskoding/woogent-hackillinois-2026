@@ -1,0 +1,101 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    command: --innodb-buffer-pool-size=64M --innodb-log-buffer-size=8M --max-connections=50
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./wordpress/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "wordpress", "-pwordpress"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  wordpress:
+    image: wordpress:6.8-php8.3-apache
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_TABLE_PREFIX: wp_
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wordpress/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+      - ./wordpress/uploads:/var/www/html/wp-content/uploads
+      - ./wordpress/theme-overrides/footer.php:/var/www/html/wp-content/themes/twentytwentyfive/patterns/footer.php:ro
+
+  wpcli:
+    image: wordpress:cli-php8.3
+    depends_on:
+      mysql:
+        condition: service_healthy
+      wordpress:
+        condition: service_started
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wordpress/setup.sh:/setup.sh
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      WP_SITEURL: "${WP_SITEURL:-http://localhost:8080}"
+    env_file:
+      - .env
+    user: "33:33"
+    entrypoint: /bin/bash
+    command: /setup.sh
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: wordpress
+      DB_USER: wordpress
+      DB_PASSWORD: wordpress
+    volumes:
+      - ./api:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  demo:
+    build: ./demo
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "7860:7860"
+    env_file:
+      - .env
+    environment:
+      API_BASE_URL: http://api:8000
+      API_PUBLIC_URL: "${API_PUBLIC_URL:-http://localhost:8000}"
+      DEMO_MODE: "true"
+    volumes:
+      - ./demo:/app
+    command: python app.py
+
+volumes:
+  mysql_data:
+  wordpress_data:

@@ -1,0 +1,499 @@
+{
+    "info": {
+      "name": "WooGent UCP API",
+      "_postman_id": "00000000-0000-0000-0000-000000000000",
+      "description": "Postman collection for WooGent — WooCommerce UCP API + Gemini demo.",
+      "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+      { "key": "baseUrl", "value": "http://localhost:8000" },
+      { "key": "clientId", "value": "gemini-demo-client" },
+      { "key": "clientSecret", "value": "gemini-demo-secret" },
+      { "key": "token", "value": "" },
+      { "key": "sessionId", "value": "" },
+      { "key": "shippingOptionId", "value": "" },
+      { "key": "orderId", "value": "" },
+      { "key": "idempotencyKey", "value": "00000000-0000-0000-0000-000000000001" },
+      { "key": "requestId", "value": "00000000-0000-0000-0000-000000000002" }
+    ],
+    "item": [
+      {
+        "name": "1) Discovery & Health",
+        "item": [
+          {
+            "name": "GET / (root)",
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{baseUrl}}/",
+                "host": ["{{baseUrl}}"],
+                "path": [""]
+              }
+            },
+            "response": []
+          },
+          {
+            "name": "GET /health",
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{baseUrl}}/health",
+                "host": ["{{baseUrl}}"],
+                "path": ["health"]
+              }
+            },
+            "response": []
+          },
+          {
+            "name": "GET /.well-known/ucp",
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{baseUrl}}/.well-known/ucp",
+                "host": ["{{baseUrl}}"],
+                "path": [".well-known", "ucp"]
+              }
+            },
+            "response": []
+          },
+          {
+            "name": "GET /.well-known/oauth-authorization-server",
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{baseUrl}}/.well-known/oauth-authorization-server",
+                "host": ["{{baseUrl}}"],
+                "path": [".well-known", "oauth-authorization-server"]
+              }
+            },
+            "response": []
+          },
+          {
+            "name": "GET /.well-known/jwks.json",
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{baseUrl}}/.well-known/jwks.json",
+                "host": ["{{baseUrl}}"],
+                "path": [".well-known", "jwks.json"]
+              }
+            },
+            "response": []
+          }
+        ]
+      },
+      {
+        "name": "2) Auth & Demo Token",
+        "item": [
+          {
+            "name": "POST /demo/token (get demo access token)",
+            "request": {
+              "auth": {
+                "type": "basic",
+                "basic": [
+                  {
+                    "key": "username",
+                    "value": "{{clientId}}",
+                    "type": "string"
+                  },
+                  {
+                    "key": "password",
+                    "value": "{{clientSecret}}",
+                    "type": "string"
+                  }
+                ]
+              },
+              "method": "POST",
+              "header": [],
+              "body": {
+                "mode": "raw",
+                "raw": ""
+              },
+              "url": {
+                "raw": "{{baseUrl}}/demo/token",
+                "host": ["{{baseUrl}}"],
+                "path": ["demo", "token"]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "if (pm.response.code === 200) {",
+                    "  try {",
+                    "    var data = pm.response.json();",
+                    "    if (data.access_token) {",
+                    "      pm.collectionVariables.set('token', data.access_token);",
+                    "      console.log('Saved token to collection variables');",
+                    "    }",
+                    "  } catch (e) {",
+                    "    console.log('Failed to parse token response', e);",
+                    "  }",
+                    "}"
+                  ],
+                  "type": "text/javascript"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "3) Products",
+        "item": [
+          {
+            "name": "GET /ucp/products (list, limit=5)",
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{baseUrl}}/ucp/products?limit=5",
+                "host": ["{{baseUrl}}"],
+                "path": ["ucp", "products"],
+                "query": [
+                  { "key": "limit", "value": "5" }
+                ]
+              }
+            },
+            "response": []
+          },
+          {
+            "name": "GET /ucp/products search (q=hoodie&max_price=50)",
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{baseUrl}}/ucp/products?q=hoodie&max_price=50&limit=5",
+                "host": ["{{baseUrl}}"],
+                "path": ["ucp", "products"],
+                "query": [
+                  { "key": "q", "value": "hoodie" },
+                  { "key": "max_price", "value": "50" },
+                  { "key": "limit", "value": "5" }
+                ]
+              }
+            },
+            "response": []
+          },
+          {
+            "name": "GET /ucp/products/{product_id}",
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{baseUrl}}/ucp/products/{{productId}}",
+                "host": ["{{baseUrl}}"],
+                "path": ["ucp", "products", "{{productId}}"]
+              }
+            },
+            "response": []
+          }
+        ]
+      },
+      {
+        "name": "4) Checkout Sessions",
+        "item": [
+          {
+            "name": "POST /ucp/checkout-sessions (create session)",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{token}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Idempotency-Key",
+                  "value": "{{idempotencyKey}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Request-Id",
+                  "value": "{{requestId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "UCP-Agent",
+                  "value": "profile=\"https://gemini.google.com/agent\"",
+                  "type": "text"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json",
+                  "type": "text"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"line_items\": [\n    {\n      \"item\": { \"id\": \"123\", \"title\": \"Demo product\" },\n      \"quantity\": 1,\n      \"price_per_item\": { \"amount_micros\": 19990000, \"currency_code\": \"USD\" }\n    }\n  ],\n  \"currency\": \"USD\"\n}\n"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/ucp/checkout-sessions",
+                "host": ["{{baseUrl}}"],
+                "path": ["ucp", "checkout-sessions"]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                    "  try {",
+                    "    var data = pm.response.json();",
+                    "    if (data.id) {",
+                    "      pm.collectionVariables.set('sessionId', data.id);",
+                    "      console.log('Saved sessionId:', data.id);",
+                    "    }",
+                    "    if (data.order && data.order.id) {",
+                    "      pm.collectionVariables.set('orderId', data.order.id);",
+                    "    }",
+                    "  } catch (e) {",
+                    "    console.log('Failed to parse create-session response', e);",
+                    "  }",
+                    "}"
+                  ],
+                  "type": "text/javascript"
+                }
+              }
+            ]
+          },
+          {
+            "name": "GET /ucp/checkout-sessions/{session_id}",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{token}}",
+                  "type": "text"
+                }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/ucp/checkout-sessions/{{sessionId}}",
+                "host": ["{{baseUrl}}"],
+                "path": ["ucp", "checkout-sessions", "{{sessionId}}"]
+              }
+            },
+            "response": []
+          },
+          {
+            "name": "PUT /ucp/checkout-sessions/{session_id} (set shipping address)",
+            "request": {
+              "method": "PUT",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{token}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Idempotency-Key",
+                  "value": "{{idempotencyKey}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Request-Id",
+                  "value": "{{requestId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "UCP-Agent",
+                  "value": "profile=\"https://gemini.google.com/agent\"",
+                  "type": "text"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json",
+                  "type": "text"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fulfillment\": {\n    \"address\": {\n      \"street_address\": \"123 Main St\",\n      \"locality\": \"Champaign\",\n      \"administrative_area\": \"IL\",\n      \"postal_code\": \"61820\",\n      \"country_code\": \"US\"\n    }\n  }\n}\n"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/ucp/checkout-sessions/{{sessionId}}",
+                "host": ["{{baseUrl}}"],
+                "path": ["ucp", "checkout-sessions", "{{sessionId}}"]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "try {",
+                    "  var data = pm.response.json();",
+                    "  // Best-guess path for shipping options; adjust if your schema differs",
+                    "  var opts = (data.fulfillment && data.fulfillment.shipping_options) || data.shipping_options || [];",
+                    "  if (opts.length && opts[0].id) {",
+                    "    pm.collectionVariables.set('shippingOptionId', opts[0].id);",
+                    "    console.log('Saved shippingOptionId:', opts[0].id);",
+                    "  }",
+                    "} catch (e) {",
+                    "  console.log('Failed to parse update-session response', e);",
+                    "}"
+                  ],
+                  "type": "text/javascript"
+                }
+              }
+            ]
+          },
+          {
+            "name": "POST /ucp/checkout-sessions/{session_id}/complete",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{token}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Idempotency-Key",
+                  "value": "{{idempotencyKey}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Request-Id",
+                  "value": "{{requestId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "UCP-Agent",
+                  "value": "profile=\"https://gemini.google.com/agent\"",
+                  "type": "text"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json",
+                  "type": "text"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"payment_data\": {\n    \"instrument\": {\n      \"type\": \"PAYMENT_TOKEN\",\n      \"token\": \"demo-google-pay-token-xyz\"\n    },\n    \"billing_address\": {\n      \"street_address\": \"123 Main St\",\n      \"locality\": \"Champaign\",\n      \"administrative_area\": \"IL\",\n      \"postal_code\": \"61820\",\n      \"country_code\": \"US\"\n    }\n  },\n  \"fulfillment\": {\n    \"selected_option_id\": \"{{shippingOptionId}}\"\n  }\n}\n"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/ucp/checkout-sessions/{{sessionId}}/complete",
+                "host": ["{{baseUrl}}"],
+                "path": ["ucp", "checkout-sessions", "{{sessionId}}", "complete"]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "try {",
+                    "  var data = pm.response.json();",
+                    "  if (data.order && data.order.id) {",
+                    "    pm.collectionVariables.set('orderId', data.order.id);",
+                    "    console.log('Saved orderId:', data.order.id);",
+                    "  }",
+                    "} catch (e) {",
+                    "  console.log('Failed to parse complete-session response', e);",
+                    "}"
+                  ],
+                  "type": "text/javascript"
+                }
+              }
+            ]
+          },
+          {
+            "name": "POST /ucp/checkout-sessions/{session_id}/cancel",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{token}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Idempotency-Key",
+                  "value": "{{idempotencyKey}}",
+                  "type": "text"
+                },
+                {
+                  "key": "Request-Id",
+                  "value": "{{requestId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "UCP-Agent",
+                  "value": "profile=\"https://gemini.google.com/agent\"",
+                  "type": "text"
+                }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/ucp/checkout-sessions/{{sessionId}}/cancel",
+                "host": ["{{baseUrl}}"],
+                "path": ["ucp", "checkout-sessions", "{{sessionId}}", "cancel"]
+              }
+            },
+            "response": []
+          }
+        ]
+      },
+      {
+        "name": "5) Orders",
+        "item": [
+          {
+            "name": "GET /ucp/orders/{order_id}",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{token}}",
+                  "type": "text"
+                }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/ucp/orders/{{orderId}}",
+                "host": ["{{baseUrl}}"],
+                "path": ["ucp", "orders", "{{orderId}}"]
+              }
+            },
+            "response": []
+          },
+          {
+            "name": "POST /ucp/orders/webhook",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json",
+                  "type": "text"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"event_type\": \"order.completed\",\n  \"order_id\": \"123\",\n  \"timestamp\": \"2026-02-25T00:00:00Z\",\n  \"data\": {}\n}\n"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/ucp/orders/webhook",
+                "host": ["{{baseUrl}}"],
+                "path": ["ucp", "orders", "webhook"]
+              }
+            },
+            "response": []
+          }
+        ]
+      }
+    ]
+  }
