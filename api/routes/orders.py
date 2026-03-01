@@ -295,19 +295,53 @@ async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
         {"order_id": order_id_param},
     )
     row = result.mappings().first()
+
+    # Fallback: legacy WooCommerce stores orders in wp_posts when HPOS is disabled
     if not row:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=UCPError(
-                status="not_found",
-                messages=[UCPMessage(
-                    type="error",
-                    code="ORDER_NOT_FOUND",
-                    content=f"Order '{order_id}' not found.",
-                    severity="fatal",
-                )],
-            ).model_dump(),
+        legacy = await db.execute(
+            text("""
+                SELECT p.ID AS id, p.post_status AS status, p.post_date AS date_created_gmt
+                FROM wp_posts p
+                WHERE p.ID = :order_id AND p.post_type = 'shop_order'
+            """),
+            {"order_id": order_id_param},
         )
+        legacy_row = legacy.mappings().first()
+        if legacy_row:
+            # Build minimal row from postmeta
+            meta = await db.execute(
+                text("""
+                    SELECT meta_key, meta_value FROM wp_postmeta
+                    WHERE post_id = :order_id AND meta_key IN
+                    ('_order_total', '_order_tax', '_billing_email', '_payment_method')
+                """),
+                {"order_id": order_id_param},
+            )
+            meta_map = {r["meta_key"]: r["meta_value"] for r in meta.mappings().all()}
+            total = float(meta_map.get("_order_total") or 0)
+            tax = float(meta_map.get("_order_tax") or 0)
+            row = {
+                "id": legacy_row["id"],
+                "status": legacy_row["status"] or "unknown",
+                "currency": "USD",
+                "tax_amount": tax,
+                "total_amount": total,
+                "payment_method": meta_map.get("_payment_method") or "unknown",
+                "date_created_gmt": legacy_row["date_created_gmt"],
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=UCPError(
+                    status="not_found",
+                    messages=[UCPMessage(
+                        type="error",
+                        code="ORDER_NOT_FOUND",
+                        content=f"Order '{order_id}' not found.",
+                        severity="fatal",
+                    )],
+                ).model_dump(),
+            )
 
     total = float(row["total_amount"] or 0)
     tax = float(row["tax_amount"] or 0)
