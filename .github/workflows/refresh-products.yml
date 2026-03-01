@@ -1,0 +1,25 @@
+# Run this workflow from the Actions tab when you need to refresh product
+# descriptions (and sample data) in production without a full deploy.
+name: Refresh production products
+
+on:
+  workflow_dispatch:
+
+jobs:
+  refresh-products:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-import products on production
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/woogent
+            git fetch origin master
+            git reset --hard origin/master
+            echo "Running wpcli with FORCE_PRODUCT_REIMPORT=true..."
+            docker compose run --rm -e FORCE_PRODUCT_REIMPORT=true wpcli
+            echo "Product refresh complete."
