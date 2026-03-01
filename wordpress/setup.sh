@@ -40,11 +40,14 @@ wp option update woocommerce_custom_orders_table_enabled yes --allow-root 2>/dev
 # Run WooCommerce installer to create/migrate HPOS tables
 wp eval 'WC_Install::install();' --user=admin --allow-root 2>/dev/null || true
 
-# Import sample products if not already imported
+# Import sample products if not already imported (or force re-import for prod)
 PRODUCT_COUNT=$(wp post list --post_type=product --format=count --allow-root 2>/dev/null || echo "0")
-if [ "$PRODUCT_COUNT" -lt "5" ]; then
+if [ "$PRODUCT_COUNT" -lt "5" ] || [ "$FORCE_PRODUCT_REIMPORT" = "true" ]; then
+  if [ "$FORCE_PRODUCT_REIMPORT" = "true" ] && [ "$PRODUCT_COUNT" -gt "0" ]; then
+    echo "FORCE_PRODUCT_REIMPORT=true: deleting $PRODUCT_COUNT existing products and re-importing..."
+    wp post delete $(wp post list --post_type=product --format=ids --allow-root) --force --allow-root 2>/dev/null || true
+  fi
   echo "Importing WooCommerce sample data..."
-  # Download the official WooCommerce sample data
   wp plugin install wordpress-importer --activate --allow-root
   curl -sL "https://raw.githubusercontent.com/woocommerce/woocommerce/trunk/plugins/woocommerce/sample-data/sample_products.xml" \
     -o /tmp/woo-sample.xml

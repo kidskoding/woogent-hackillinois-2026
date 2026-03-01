@@ -155,6 +155,8 @@ WP_DOMAIN=http://<your-server-ip>:8080
 WP_SITEURL=http://<your-server-ip>:8080
 ```
 
+To **refresh product descriptions** in prod (re-import WooCommerce sample data), add `FORCE_PRODUCT_REIMPORT=true` to your prod `.env`, deploy, then remove it after one run so it doesn’t reset products on every deploy.
+
 3. **Start all services**
 
 ```bash
