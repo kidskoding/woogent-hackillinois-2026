@@ -241,6 +241,18 @@ TOOLS = [
             "required": ["session_id"],
         },
     },
+    {
+        "name": "get_order_status",
+        "description": "Look up an order by order ID or buyer email. Use this when the user wants to track or check the status of an order.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "order_id": {"type": "string", "description": "Order ID (e.g. '136'). Use this if known."},
+                "email": {"type": "string", "description": "Buyer's email address. Returns all orders for that email."},
+            },
+            "required": [],
+        },
+    },
 ]
 
 
@@ -465,6 +477,19 @@ def execute_tool(name: str, args: dict, token: str) -> str:
                 timeout=10,
             )
             return json.dumps(r.json(), indent=2)
+
+        elif name == "get_order_status":
+            auth = {"Authorization": headers["Authorization"]}
+            order_id = args.get("order_id", "").strip()
+            email = args.get("email", "").strip()
+            if order_id:
+                r = httpx.get(f"{API_BASE}/ucp/orders/{order_id}", headers=auth, timeout=10)
+                return json.dumps(r.json(), indent=2)
+            elif email:
+                r = httpx.get(f"{API_BASE}/ucp/orders", params={"email": email, "limit": 5}, headers=auth, timeout=10)
+                return json.dumps(r.json(), indent=2)
+            else:
+                return json.dumps({"error": "Provide order_id or email to look up an order."})
 
     except Exception as e:
         return json.dumps({"error": str(e)})
