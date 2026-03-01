@@ -69,6 +69,19 @@ State-mutating checkout calls also require: **Idempotency-Key** (UUID), **Reques
 
 All monetary values use `amount_micros` (integer, currency × 1,000,000):
 - `$19.99` → `amount_micros: 19990000`
+
+### Error codes (UCP format)
+
+Errors return `{"status": "...", "messages": [{"type": "error", "code": "...", "content": "...", "severity": "fatal"|"recoverable"}]}`.
+
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `MISSING_IDEMPOTENCY_KEY` | 400 | Idempotency-Key header required on state-mutating checkout/order calls. |
+| `MISSING_TOKEN` | 401 | Authorization: Bearer header required. |
+| `INVALID_TOKEN` | 401 | Token invalid, expired, or revoked. |
+| `SESSION_NOT_FOUND` | 404 | Checkout session ID unknown or expired. |
+| `PRODUCT_NOT_FOUND` | 404 | Product ID not found. |
+| `ORDER_NOT_FOUND` | 404 | Order ID not found. |
 """,
     version="1.0.0",
     contact={
@@ -78,6 +91,15 @@ All monetary values use `amount_micros` (integer, currency × 1,000,000):
     license_info={
         "name": "MIT",
     },
+    openapi_tags=[
+        {"name": "Discovery", "description": "UCP manifest and OAuth server metadata."},
+        {"name": "Products", "description": "Search and retrieve product catalog."},
+        {"name": "OAuth 2.0", "description": "Authorization and token endpoints."},
+        {"name": "Checkout", "description": "Create and manage checkout sessions."},
+        {"name": "Orders", "description": "List, get, and cancel orders."},
+        {"name": "Demo", "description": "Demo token shortcut (DEMO_MODE only)."},
+        {"name": "System", "description": "Health and utility."},
+    ],
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",

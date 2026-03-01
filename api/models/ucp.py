@@ -9,7 +9,7 @@ Spec reference: https://ucp.dev/specification/checkout-rest/
 from __future__ import annotations
 
 from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +178,21 @@ class PaymentInfo(BaseModel):
 
 class CreateSessionRequest(BaseModel):
     """POST /ucp/checkout-sessions"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "line_items": [
+                    {
+                        "item": {"id": "19", "title": "Hoodie with Logo"},
+                        "quantity": 1,
+                        "price_per_item": {"amount_micros": 45000000, "currency_code": "USD"},
+                    }
+                ],
+                "currency": "USD",
+            }
+        }
+    )
 
     line_items: list[LineItem] = Field(..., min_length=1)
     currency: str = Field(default="USD")
