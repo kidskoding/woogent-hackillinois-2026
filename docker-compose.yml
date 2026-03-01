@@ -46,6 +46,7 @@ services:
         condition: service_started
     volumes:
       - wordpress_data:/var/www/html
+      - ./wordpress/uploads:/var/www/html/wp-content/uploads
       - ./wordpress/setup.sh:/setup.sh
     environment:
       WORDPRESS_DB_HOST: mysql:3306
