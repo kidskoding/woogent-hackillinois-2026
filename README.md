@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
 </p>
 
-For HackIllinois 2026, I built **Woogent**, which uses my own UCP API at an end-to-end level that implements Google’s **Universal Commerce Protocol (UCP)** on top of a WooCommerce MySQL database that ships with a **Gemini-powered AI shopping demo**.
+For HackIllinois 2026, I built **Woogent**, an API that lets AI agents shop on online stores: built and catered towards small businesses using Google's **Universal Commerce Protocol (UCP)** on top of a WooCommerce MySQL database that ships with a **Gemini-powered AI shopping demo** and a **Woogent Demo Store** backed via WooCommerce
 
 At a high level:
 - **Backend API (`api/`)**: FastAPI service that exposes a UCP-compliant REST API backed by a WooCommerce database.
@@ -20,15 +20,29 @@ At a high level:
 
 ---
 
+### The Problem
+
+Retail can be split into three categories:
+
+- **Large enterprises** (e.g. **Amazon** and **Walmart**) use their own commerce platforms
+- **Medium retailers** use large marketplaces like **Shopify**, **Wix**, and **Etsy**
+- **Small retailers** rely on free and open-source platforms like WooCommerce
+
+Today, **roughly 4 million small retailers** still have no path to agentic commerce. They lack the technical expertise and capital to build or adopt AI-native shopping experiences, so they stay invisible to the growing ecosystem of AI shopping agents and voice assistants. Woogent is built for this gap: it adds a standards-based UCP-based API on top of the stack e-commerce already uses (WooCommerce) with no migration and no custom platform.
+
+> **📖 [The Woogent Story](STORY.md)** — What inspired me, what I learned, how I built it, and the challenges I faced (Markdown + LaTeX).
+
+---
+
 ### Why Woogent?
 
 WooGent turns an existing WooCommerce store into an AI-native commerce backend, without asking merchants to migrate platforms.
 
 - **Built for a real integration gap**: WooCommerce storefronts are mature, but they are not directly consumable by LLM shopping agents. WooGent adds a standards-oriented UCP layer so AI clients can discover, browse, and transact against live merchant data.
-- **Useful beyond the demo**: The same API works for cURL/Postman, server-to-server integrations, and function-calling AI clients. The Gemini UI is a proof client, not the product itself.
+- **An API at its Core**: Woogent is still an API at its core. The Google Gemini Shopping Agent is a live demonstration of how an AI Agent can use my Woogent API. Other use cases include server-to-server integrations and function-calling AI clients. Because Woogent is an API at its core, it can still be tested independently via cURL and Postman!
 - **Commerce flows modeled explicitly**: Checkout sessions and orders are separate resources with clear lifecycle transitions, idempotent mutations, and predictable error behavior.
-- **Developer-ready experience**: OAuth/JWT auth, machine-readable discovery, structured error responses, and a Docker-first setup make it fast to evaluate and integrate.
-- **Future-facing but practical**: It enables AI-assisted shopping today while staying compatible with existing WooCommerce operations and data models.
+- **Developer-ready experience**: OAuth/JWT auth, machine-readable discovery, structured error responses, and a Docker-first setup make it fast to evaluate and integrate!
+- **Future-facing but practical**: It enables AI-assisted shopping today while staying compatible with existing WooCommerce operations and data models
 
 ---
 
@@ -155,7 +169,12 @@ WP_DOMAIN=http://<your-server-ip>:8080
 WP_SITEURL=http://<your-server-ip>:8080
 ```
 
-To **refresh product descriptions** in prod (re-import WooCommerce sample data), add `FORCE_PRODUCT_REIMPORT=true` to your prod `.env`, deploy, then remove it after one run so it doesn’t reset products on every deploy.
+To **refresh product descriptions** in prod (re-import WooCommerce sample data):
+
+- **Recommended:** In GitHub go to **Actions → "Refresh production products" → Run workflow**. This runs the re-import on the server with no need to edit `.env`.
+- Or SSH to the server and run:  
+  `cd ~/woogent && docker compose run --rm -e FORCE_PRODUCT_REIMPORT=true wpcli`  
+  (then remove `FORCE_PRODUCT_REIMPORT` from prod `.env` if you had added it there.)
 
 3. **Start all services**
 
