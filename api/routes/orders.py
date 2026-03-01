@@ -355,7 +355,7 @@ async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
             FROM wp_wc_order_addresses
             WHERE order_id = :order_id
         """),
-        {"order_id": order_id},
+        {"order_id": order_id_param},
     )
     addresses = {r["address_type"]: dict(r) for r in addr_result.mappings().all()}
 
@@ -385,7 +385,7 @@ async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
             WHERE oi.order_id = :order_id AND oi.order_item_type = 'line_item'
             GROUP BY oi.order_item_id
         """),
-        {"order_id": order_id},
+        {"order_id": order_id_param},
     )
     line_items = []
     for li in li_result.mappings().all():

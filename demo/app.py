@@ -243,12 +243,12 @@ TOOLS = [
     },
     {
         "name": "get_order_status",
-        "description": "Look up an order by order ID or buyer email. Use this when the user wants to track or check the status of an order.",
+        "description": "Look up an order by order ID or buyer email. Use this when the user wants to track or check the status of an order. Prefer email when the user provided it during checkout — it's more reliable than order_id.",
         "parameters": {
             "type": "object",
             "properties": {
-                "order_id": {"type": "string", "description": "Order ID (e.g. '136'). Use this if known."},
-                "email": {"type": "string", "description": "Buyer's email address. Returns all orders for that email."},
+                "order_id": {"type": "string", "description": "Order ID (e.g. '136'). Use if known."},
+                "email": {"type": "string", "description": "Buyer's email address. Returns all orders for that email. Prefer this when available."},
             },
             "required": [],
         },
@@ -482,11 +482,27 @@ def execute_tool(name: str, args: dict, token: str) -> str:
             auth = {"Authorization": headers["Authorization"]}
             order_id = args.get("order_id", "").strip()
             email = args.get("email", "").strip()
-            if order_id:
+            # Prefer email when available — more reliable than order_id
+            if email:
+                r = httpx.get(f"{API_BASE}/ucp/orders", params={"email": email, "limit": 10}, headers=auth, timeout=10)
+                data = r.json()
+                if r.status_code == 200 and data.get("orders"):
+                    # If we also have order_id, try to return that specific order's details
+                    if order_id:
+                        match = next((o for o in data["orders"] if str(o.get("id")) == str(order_id)), None)
+                        if match:
+                            detail = httpx.get(f"{API_BASE}/ucp/orders/{order_id}", headers=auth, timeout=10)
+                            if detail.status_code == 200:
+                                return json.dumps(detail.json(), indent=2)
+                    return json.dumps(data, indent=2)
+                return json.dumps(data, indent=2)
+            elif order_id:
                 r = httpx.get(f"{API_BASE}/ucp/orders/{order_id}", headers=auth, timeout=10)
-                return json.dumps(r.json(), indent=2)
-            elif email:
-                r = httpx.get(f"{API_BASE}/ucp/orders", params={"email": email, "limit": 5}, headers=auth, timeout=10)
+                if r.status_code == 404:
+                    return json.dumps({
+                        "error": "ORDER_NOT_FOUND",
+                        "message": f"Order {order_id} not found. If you have the buyer's email from checkout, retry get_order_status with email instead.",
+                    }, indent=2)
                 return json.dumps(r.json(), indent=2)
             else:
                 return json.dumps({"error": "Provide order_id or email to look up an order."})
@@ -548,7 +564,8 @@ def chat(message: str, history: list):
             "CRITICAL: Never invent or guess an order number. If you cannot find order.id in the response, "
             "say 'Your order has been placed' without mentioning a number. "
             "Mention that they can track their order using the email they provided. "
-            "NEVER invent or hallucinate URLs or order numbers."
+            "When the user asks to track or check their order status, ALWAYS use get_order_status with the "
+            "buyer's email (from the checkout) — it is more reliable than order_id. Pass both email and order_id if you have both."
         ),
     )
 

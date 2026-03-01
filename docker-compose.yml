@@ -76,6 +76,7 @@ services:
       DB_NAME: wordpress
       DB_USER: wordpress
       DB_PASSWORD: wordpress
+      DEMO_MODE: "true"
     volumes:
       - ./api:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
