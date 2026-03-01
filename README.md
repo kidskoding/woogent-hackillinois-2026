@@ -1,4 +1,4 @@
-### Woogent (HackIllinois 2026) — WooCommerce UCP API + Gemini Shopping Demo
+# Woogent (HackIllinois 2026)
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white" alt="Python">
