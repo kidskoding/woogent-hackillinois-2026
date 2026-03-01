@@ -145,9 +145,53 @@ foreach ($products as $slug => $data) {
     echo "Not found: $slug\n";
   }
 }
+
+// Fix product images by re-linking existing attachment files to the correct products.
+// After a re-import the CDN downloads can fail, leaving broken attachment records.
+// We match by basename so the bind-mounted uploads files always win.
+$product_images = [
+  'v-neck-t-shirt'    => ['thumb' => 'vneck-tee-2.jpg',         'gallery' => ['vnech-tee-green-1.jpg', 'vnech-tee-blue-1.jpg']],
+  'hoodie'            => ['thumb' => 'hoodie-2.jpg',             'gallery' => ['hoodie-blue-1.jpg', 'hoodie-green-1.jpg', 'hoodie-with-logo-2.jpg']],
+  'hoodie-with-logo'  => ['thumb' => 'hoodie-with-logo-2.jpg',   'gallery' => []],
+  't-shirt'           => ['thumb' => 'tshirt-2.jpg',             'gallery' => []],
+  'beanie'            => ['thumb' => 'beanie-2.jpg',             'gallery' => []],
+  'belt'              => ['thumb' => 'belt-2.jpg',               'gallery' => []],
+  'cap'               => ['thumb' => 'cap-2.jpg',                'gallery' => []],
+  'sunglasses'        => ['thumb' => 'sunglasses-2.jpg',         'gallery' => []],
+  'hoodie-with-pocket'=> ['thumb' => 'hoodie-with-pocket-2.jpg', 'gallery' => []],
+  'hoodie-with-zipper'=> ['thumb' => 'hoodie-with-zipper-2.jpg', 'gallery' => []],
+  'long-sleeve-tee'   => ['thumb' => 'long-sleeve-tee-2.jpg',   'gallery' => []],
+  'polo'              => ['thumb' => 'polo-2.jpg',               'gallery' => []],
+  'album'             => ['thumb' => 'album-1.jpg',              'gallery' => []],
+  'single'            => ['thumb' => 'single-1.jpg',             'gallery' => []],
+  't-shirt-with-logo' => ['thumb' => 't-shirt-with-logo-1.jpg',  'gallery' => []],
+  'beanie-with-logo'  => ['thumb' => 'beanie-with-logo-1.jpg',   'gallery' => []],
+  'logo-collection'   => ['thumb' => 'logo-1.jpg',               'gallery' => []],
+  'wordpress-pennant' => ['thumb' => 'pennant-1.jpg',            'gallery' => []],
+];
+// Build filename -> attachment_id index
+$att_cache = [];
+$att_posts = get_posts(['post_type' => 'attachment', 'numberposts' => -1, 'post_status' => 'inherit']);
+foreach ($att_posts as $att) {
+  $file = basename(get_attached_file($att->ID));
+  if ($file) $att_cache[$file] = $att->ID;
+}
+foreach ($product_images as $slug => $images) {
+  $post = get_page_by_path($slug, OBJECT, 'product');
+  if (!$post) continue;
+  if (!empty($att_cache[$images['thumb']])) {
+    update_post_meta($post->ID, '_thumbnail_id', $att_cache[$images['thumb']]);
+  }
+  $gallery_ids = [];
+  foreach ($images['gallery'] as $gfile) {
+    if (!empty($att_cache[$gfile])) $gallery_ids[] = $att_cache[$gfile];
+  }
+  update_post_meta($post->ID, '_product_image_gallery', implode(',', $gallery_ids));
+  echo "Fixed images: $slug\n";
+}
 PHP
 wp eval-file /tmp/update-descriptions.php --allow-root 2>/dev/null || true
-echo "Product descriptions applied."
+echo "Product descriptions and images applied."
 
 # Install and configure Stripe payment gateway (check filesystem for fresh deploys)
 if [ ! -d "wp-content/plugins/woocommerce-gateway-stripe" ]; then

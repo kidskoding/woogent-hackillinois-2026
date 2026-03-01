@@ -20,6 +20,6 @@ jobs:
             cd ~/woogent
             git fetch origin master
             git reset --hard origin/master
-            echo "Running wpcli with FORCE_PRODUCT_REIMPORT=true..."
-            docker compose run --rm -e FORCE_PRODUCT_REIMPORT=true wpcli
+            echo "Running wpcli to patch descriptions and images (no reimport)..."
+            docker compose run --rm wpcli
             echo "Product refresh complete."
