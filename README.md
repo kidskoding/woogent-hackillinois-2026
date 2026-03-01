@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
 </p>
 
-For HackIllinois 2026, I built **Woogent**, an API that lets AI agents shop on online stores: built and catered towards small businesses using Google's **Universal Commerce Protocol (UCP)** on top of a WooCommerce MySQL database that ships with a **Gemini-powered AI shopping demo** and a **Woogent Demo Store** backed via WooCommerce
+> For HackIllinois 2026, I built **Woogent**, an API that lets AI agents shop on online stores: built and catered towards small businesses using Google's **Universal Commerce Protocol (UCP)** on top of a WooCommerce MySQL database that ships with a **Gemini-powered AI shopping demo** and a **Woogent Demo Store** backed via WooCommerce
 
 At a high level:
 - **Backend API (`api/`)**: FastAPI service that exposes a UCP-compliant REST API backed by a WooCommerce database.
@@ -29,8 +29,6 @@ Retail can be split into three categories:
 - **Small retailers** rely on free and open-source platforms like WooCommerce
 
 Today, **roughly 4 million small retailers** still have no path to agentic commerce. They lack the technical expertise and capital to build or adopt AI-native shopping experiences, so they stay invisible to the growing ecosystem of AI shopping agents and voice assistants. Woogent is built for this gap: it adds a standards-based UCP-based API on top of the stack e-commerce already uses (WooCommerce) with no migration and no custom platform.
-
-> **📖 [The Woogent Story](STORY.md)** — What inspired me, what I learned, how I built it, and the challenges I faced (Markdown + LaTeX).
 
 ---
 
